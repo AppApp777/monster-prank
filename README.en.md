@@ -76,12 +76,12 @@ If something breaks or you have an idea, open an [issue](https://github.com/AppA
 
 ## About
 
-七也 (Qiye). I try things nobody has explained properly, then explain them. I post on two Chinese platforms:
+七也 (Qiye). I try things nobody has explained properly, then explain them. I post on two Chinese platforms — scan either code inside that app to find me.
 
-| Platform | Name | ID |
-|---|---|---|
-| Douyin | 七也 | `miao1162603325` |
-| Xiaohongshu | 七也 | `5441921009` |
+| Douyin | Xiaohongshu |
+|:---:|:---:|
+| <img src="assets/qr-douyin.png" width="160" alt="Douyin 七也"> | <img src="assets/qr-xiaohongshu.png" width="160" alt="Xiaohongshu 七也"> |
+| 七也 · `miao1162603325` | 七也 · `5441921009` |
 
 ## Changelog
 
