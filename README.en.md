@@ -6,6 +6,8 @@
 
 A Windows screen prank tool. At the time you set, a monster jumps up from the bottom of the screen and screams. About five seconds later the program exits on its own.
 
+<p><a href="README.md">简体中文</a> · <b>English</b></p>
+
 <p>
 <img src="https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078D4?style=for-the-badge" alt="Platform">
 <img src="https://img.shields.io/badge/Size-49%20MB-6B5442?style=for-the-badge" alt="Size">
@@ -16,8 +18,6 @@ A Windows screen prank tool. At the time you set, a monster jumps up from the bo
 <img src="assets/demo.gif" width="800" alt="Demo">
 
 </div>
-
-> 中文说明见 **[README.md](README.md)**. This project is primarily documented in Chinese.
 
 ## What it does
 

@@ -6,6 +6,8 @@
 
 一个 Windows 屏幕恶作剧工具。到设定的时间，一只怪兽会从屏幕底部窜上来叫一声，大约五秒后程序自己退出。
 
+<p><b>简体中文</b> · <a href="README.en.md">English</a></p>
+
 <p>
 <img src="https://img.shields.io/badge/%E5%B9%B3%E5%8F%B0-Windows%2010%20%7C%2011-0078D4?style=for-the-badge" alt="平台 Windows 10 或 11">
 <img src="https://img.shields.io/badge/%E5%A4%A7%E5%B0%8F-49%20MB-6B5442?style=for-the-badge" alt="大小 49 MB">
