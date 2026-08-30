@@ -1,0 +1,38 @@
+name: 用着不对劲
+description: 出了问题、或者哪里看不懂，都可以在这儿说。不懂技术也没关系。
+title: "[问题] "
+labels: ["待看"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        随便说就行，不用写得很专业。下面三个空能填多少填多少。
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: 你用的是什么系统
+      options:
+        - Windows 11
+        - Windows 10
+        - macOS
+        - 不知道 / 其他
+    validations:
+      required: true
+
+  - type: textarea
+    id: what
+    attributes:
+      label: 你看到了什么
+      description: 用大白话描述就行，比如“双击了没反应”“弹了个蓝框”“开了之后闪一下就没了”。
+      placeholder: 我双击那个文件之后……
+    validations:
+      required: true
+
+  - type: textarea
+    id: shot
+    attributes:
+      label: 能不能截个图
+      description: 把图片直接拖进这个框就能上传。截不了也没关系，跳过就行。
+    validations:
+      required: false

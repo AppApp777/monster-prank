@@ -1,0 +1,19 @@
+__pycache__/
+build/
+dist/
+*.pyc
+
+# 母带与中间产物：太大，不进仓库，成品走 Release 附件
+assets/*.mov
+assets/*.mp4
+assets/logo/_gen/
+assets/logo/_prompt-*.txt
+assets/logo/_ref-*.png
+
+# 退役的旧素材：母带和中间产物都还在本地，仓库只带当前在用的这一套
+assets/monster_transparent_fast*
+assets/monster_transparent_poster.png
+assets/monster_transparent_shaken_poster.png
+
+# 内部工作档（进度、bug 历史），不进公开仓
+docs/

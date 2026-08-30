@@ -1,0 +1,35 @@
+Create one uninterrupted five-second practical-effects horror shot with a locked camera. This must be newly generated physical motion, not a sped-up clip, not a repeated loop, and not a still image with a global transform.
+
+MATCH THE REFERENCE:
+Use the same bald goblin-like horror monster: dark wrinkled brown skin, glowing pale eyes, pointed ears, open toothy mouth, and blue-white shoulders. It is a solid three-dimensional rubber horror puppet with thickness, weight, and volume. Keep the monster recognizable and keep its final size large in the frame.
+
+FIXED CAMERA AND BACKGROUND:
+Use a completely locked tripod camera. The saturated chroma-key green background is a rigid, perfectly still flat plane in every frame. Do not shake, pan, tilt, zoom, dolly, crop, warp, flicker, or animate the camera or the green background. Only the physical monster puppet moves. There is no visible television, screen border, room, prop, or shadow movement.
+
+ACTION HAS TWO DISTINCT PHYSICAL PHASES:
+
+PHASE ONE — EXPLOSIVE ENTRANCE:
+At 0.00 seconds, the monster is entirely below the bottom edge and only the fixed green background is visible. A barely visible thin top edge may enter at the bottom edge, but there must be no waiting, probing, or lingering head.
+Between 0.04 and 0.20 seconds, the monster is pulled straight upward from below the frame in one violent burst. The top of the head appears first, then the head, jaw, ears, and both shoulders follow immediately as one connected heavy object. The full monster must reach its final large size by 0.20 seconds. This is a fast physical translation upward, not a slow rise, crawl, climb, float, fade, morph, growth, zoom, or camera push-in.
+Immediately after entering, the puppet overshoots slightly and recoils for a brief instant. Do not let it settle or pause.
+
+PHASE TWO — VIOLENT PUPPET SHAKING:
+From approximately 0.22 seconds through the end, an unseen person outside the bottom edge grips the lower torso or neck of the physical puppet and shakes it hard and continuously. The hand, arm, person, grip, string, stick, and every holding device remain completely outside the frame.
+
+The whole monster must move as one connected physical body through screen space. Make the head, shoulders, jaw, ears, eyelids, wrinkles, and mouth respond to the same offscreen grip with visible inertia and secondary deformation. The monster must repeatedly sweep left and right by roughly 20–30 percent of its own width, jerk vertically by roughly 10–15 percent of frame height, and roll irregularly by roughly 12–18 degrees. Use abrupt reversals, overshoot, recoil, short forceful bursts, and changing trajectories. Use about five to eight strong direction reversals per second. There is no slow pendulum motion and no pause after the entrance.
+
+The intended feeling is a real rubber horror toy being grabbed below the frame and whipped violently by an unseen hand. It is not a face bobbing in place. It is not a camera shake. It is not a whole rectangular video layer moving. The silhouette, shoulder position, head angle, jaw opening, and facial expression must change from frame to frame because the generated three-dimensional puppet is reacting to force.
+
+CONTINUITY AND SOUND:
+Generate varied physical movement for the complete five-second duration. Do not freeze, hold, repeat, loop, or time-compress a shorter motion segment to fill time. Do not reuse the same oscillation pattern. Keep the monster visible for almost all of the final 4.8 seconds. Add one immediate harsh monster shriek at the explosive entrance and irregular short growls during the violent shaking, while keeping the fixed green background silent and unchanged.
+
+CRITICAL NEGATIVE CONSTRAINTS:
+Do not show a hand, arm, person, holder, string, stick, or prop.
+Do not shake the camera or move the green background.
+Do not move the entire rectangular image.
+Do not use a photograph, poster, flat texture, 2D card, or static image.
+Do not use simple pan, zoom, rotation, global jitter, or fast-forwarding to fake physical motion.
+Do not keep the monster still while only the frame moves.
+Do not make the monster slowly probe upward or wait at the bottom.
+Do not make the monster crawl, climb, float, hover, walk, morph, or transform into another face.
+Do not use cuts, fades, transitions, text, black frames, background changes, or a repeated short segment.

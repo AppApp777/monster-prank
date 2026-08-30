@@ -1,0 +1,22 @@
+Create a single uninterrupted one-second practical-effects horror shot showing only the monster explosively entering the frame. This must be newly generated physical motion, not a sped-up clip and not a still image with a global transform.
+
+MATCH THE REFERENCE:
+Use the same bald goblin-like horror monster: dark wrinkled brown skin, glowing pale eyes, pointed ears, open toothy mouth, and blue-white shoulders. It is a solid three-dimensional rubber horror puppet with thickness, volume, and weight. Keep the final monster large and recognizable.
+
+FIXED CAMERA AND GREEN BACKGROUND:
+Use a completely locked tripod camera. The saturated chroma-key green background is perfectly flat, rigid, and unchanged in every frame. Do not shake, pan, tilt, zoom, dolly, crop, warp, flicker, or animate the camera or the background. Only the physical monster moves. No room, television, screen border, prop, hand, arm, or shadow movement.
+
+ENTRANCE TIMING:
+At time 0.00, only a hair-thin top edge of the monster is visible at the very bottom edge, matching the input first frame. The monster must not wait, probe, or linger.
+Between 0.02 and 0.20 seconds, pull the monster straight upward from below the frame in one explosive physical burst. The top of the head appears first, followed immediately by the whole head, jaw, ears, and both shoulders as one connected heavy puppet. The full monster must reach its final large size by 0.20 seconds. This is a sudden vertical translation, not a slow rise, crawl, climb, float, fade, morph, growth, zoom, or camera push-in.
+Immediately after entering, allow only one tiny overshoot and recoil caused by inertia. From roughly 0.25 seconds to the end, keep the monster fully visible at its final size and nearly stable. This entrance shot must not spend its duration slowly rising and must not add a long shake sequence; the separate shaking shot will handle that action.
+
+PHYSICAL MOTION:
+The monster is a real three-dimensional puppet moving upward through the fixed green space. The head, shoulders, jaw, ears, and facial surface remain physically connected. Generate new temporal frames of the puppet. Do not move a rectangular image layer, camera, or background. Add a sharp horror shriek at the instant of the burst if audio is generated.
+
+CRITICAL NEGATIVE CONSTRAINTS:
+Do not show a hand, arm, person, holder, string, stick, or prop.
+Do not shake the camera or move the green background.
+Do not use a photograph, poster, flat texture, 2D card, static image, simple pan, zoom, rotation, global jitter, fast-forwarding, or looping.
+Do not make the monster slowly rise, crawl, climb, float, hover, walk, morph, or wait at the bottom.
+Do not use cuts, fades, transitions, black frames, text, or background changes.

@@ -1,0 +1,26 @@
+Create a single uninterrupted four-second practical-effects horror shot that begins after the monster has already fully entered the frame. This must be newly generated physical motion, not a sped-up clip, not a repeated loop, and not a still image with a global transform.
+
+MATCH THE REFERENCE:
+Use the same bald goblin-like horror monster: dark wrinkled brown skin, glowing pale eyes, pointed ears, open toothy mouth, and blue-white shoulders. It is a solid three-dimensional rubber horror puppet with thickness, volume, and weight. The first frame already shows the complete monster at its final large size. Keep the monster recognizable while its pose and silhouette react to force.
+
+FIXED CAMERA AND GREEN BACKGROUND:
+Use a completely locked tripod camera. The saturated chroma-key green background is a perfectly flat, rigid, unchanged plane in every frame. Do not shake, pan, tilt, zoom, dolly, crop, warp, flicker, or animate the camera or the green background. Only the physical monster puppet moves. No visible room, television, screen border, shadow movement, hand, arm, person, or holding device.
+
+IMMEDIATE FULL-BODY PUPPET ACTION:
+At 0.00 seconds the monster is already fully visible, not below the frame. From the very first frame, an unseen person outside the bottom edge grips the lower torso or neck and violently shakes the entire physical puppet. There is no entrance, no empty-green lead-in, no slow start, no settling, and no pause.
+
+The whole monster must move through screen space as one connected three-dimensional object. The head, shoulders, jaw, ears, eyelids, wrinkles, and mouth must react to the same offscreen grip with visible inertia and secondary deformation. Repeatedly sweep the entire monster left and right by roughly 20–30 percent of its own width, jerk it vertically by roughly 10–15 percent of frame height, and roll it irregularly by roughly 12–18 degrees. Use abrupt reversals, overshoot, recoil, short forceful bursts, and changing trajectories at roughly five to eight strong reversals per second. The movement must feel like a real rubber horror toy being grabbed below the frame and whipped hard. The monster must remain visible for almost the entire shot.
+
+The first and last frames may have different horizontal positions and angles, but the intermediate motion must be varied and continuous. Do not drift slowly from the first pose to the last pose. Generate new temporal frames of the full puppet: its silhouette, shoulder line, head angle, mouth opening, and facial surface must visibly change frame by frame because of physical force.
+
+SOUND:
+If the workflow generates audio, add irregular harsh monster shrieks and short growls synchronized with the violent shaking. Do not let audio changes alter the fixed green background.
+
+CRITICAL NEGATIVE CONSTRAINTS:
+Do not show a hand, arm, person, grip, string, stick, holder, or prop.
+Do not shake, move, zoom, or warp the camera or the green background.
+Do not move the entire rectangular image.
+Do not use a photograph, poster, flat texture, 2D card, static image, simple pan, zoom, rotation, global jitter, fast-forwarding, freezing, or a repeated short segment.
+Do not make only the face bob while the body stays fixed.
+Do not make the monster slowly sway, pendulum, drift, float, crawl, climb, walk, morph, or transform into another face.
+Do not add an entrance, empty-green lead-in, pause, cut, fade, transition, black frame, text, or background change.

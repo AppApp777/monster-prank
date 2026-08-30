@@ -1,0 +1,41 @@
+Create a single continuous two-second practical-effects horror shot, not an animation of a still image and not a sped-up or looped version of an existing clip.
+
+MOTION INTENT — THIS IS THE REQUIRED EVENT, NOT JUST A SPEED SETTING:
+The shot has two clearly separate physical events. First, the monster is completely below the bottom edge and explosively thrusts upward into the frame. Second, after it is fully visible, an unseen hand below the frame violently whips the entire solid monster puppet around. Do not interpret “fast” as merely increasing playback speed. The monster must travel through space as one connected three-dimensional object, with the head, shoulders, jaw, ears, and facial surface reacting to the same physical grip. The movement must look like a rubber horror toy being grabbed and shaken hard, not like a face bobbing in place, a camera shake, a global image transform, or a repeated short loop.
+
+Match the reference monster exactly: the same bald goblin-like horror monster, dark wrinkled brown skin, glowing pale eyes, pointed ear, open toothy mouth, and blue-white shoulders. Treat it as a solid three-dimensional rubber horror puppet with real volume, thickness, and weight. It is a physical object in front of the green screen, not a photograph, poster, flat texture, 2D card, or screen image.
+
+CAMERA AND BACKGROUND:
+Use a locked tripod camera. The camera must remain completely still. Do not shake, pan, tilt, zoom, dolly, crop, or move the camera. The saturated chroma-key green background must stay perfectly fixed and unchanged in every frame. Only the physical monster puppet moves. No background motion, lighting flicker, moving shadows, visible screen, or television frame.
+
+TIMELINE:
+From 0.00 to 0.03 seconds, show only the flat green background. The monster is completely below the bottom edge and invisible.
+
+From 0.03 to 0.15 seconds, the monster launches straight upward from below the bottom edge at nearly constant size. The top of the head appears first, followed immediately by the face and shoulders. The full monster must be visible by 0.15 seconds. This is a sudden fast physical jump, not growth, zooming, fading, crawling, walking, climbing, floating, or a slow rise.
+
+From 0.15 to 0.22 seconds, the monster makes a sharp physical overshoot and immediate recoil.
+
+From 0.22 seconds to the end of the two-second shot, an unseen person outside the frame shakes the physical monster puppet extremely fast and continuously. The invisible grip is below the bottom edge around the lower torso or neck. The hand, arm, person, grip, string, stick, and every other holding device must stay completely outside the frame.
+
+FAST PHYSICAL SUBJECT MOTION:
+The monster itself must move rapidly relative to the fixed green background. Generate new temporal frames of the three-dimensional puppet. Use short, forceful, irregular bursts with four to six strong direction reversals per second, with no pause and no slow pendulum motion. Swing the monster left and right by roughly 15 to 25 percent of its own width, move it vertically by roughly 8 to 12 percent of the frame height, and add irregular roll rotation of about 10 to 15 degrees. Use abrupt reversals, visible inertia, overshoot, recoil, and slight secondary motion of the jaw, ears, eyelids, wrinkles, and mouth. Add motion blur to the monster only. Keep the monster visible for almost all of the final 1.8 seconds.
+
+The motion must feel like a real rubber horror puppet being grabbed and shaken hard at high speed. The action is fast, staccato, physical, and chaotic. The movement source is the unseen grip below the frame, not the camera. The monster silhouette and facial position must change from frame to frame. Do not reuse one still image and apply a global transform.
+
+CONTINUITY REQUIREMENT:
+Generate varied motion for the full requested duration. Do not satisfy the duration by repeating, looping, freezing, or time-compressing a shorter action. The entrance must be a distinct explosive upward displacement, and the later shaking must contain changing irregular trajectories rather than the same oscillation repeating.
+
+CRITICAL NEGATIVE CONSTRAINTS:
+Do not shake the camera.
+Do not move, warp, or animate the green background.
+Do not move the entire rectangular image.
+Do not use a still image with simple pan, zoom, rotation, or global jitter.
+Do not keep the monster frozen while the frame moves.
+Do not make the monster move slowly or pause after appearing.
+Do not replace the required physical action with simple fast-forwarding of a slow action.
+Do not repeat a short segment to fill the requested duration.
+Do not show a hand, arm, person, holder, string, stick, or prop.
+Do not add extra limbs or a second monster.
+Do not morph or replace the face.
+Do not make the monster walk, crawl, climb, float, hover, or wait at the bottom.
+Do not use cuts, fades, transitions, text, or background changes.

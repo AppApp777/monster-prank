@@ -1,0 +1,32 @@
+Create a continuous practical-effects horror shot, not an animation of a still image.
+
+Match the reference monster exactly: the same bald goblin-like horror monster, dark wrinkled brown skin, glowing pale eyes, pointed ear, open toothy mouth, and blue-white shoulders. The monster is a solid three-dimensional rubber horror puppet with real volume and thickness, not a photograph, poster, flat texture, 2D card, or screen image.
+
+CAMERA AND BACKGROUND:
+The camera is locked on a tripod for the entire shot. The camera must not shake, pan, tilt, zoom, dolly, crop, or move in any way. The saturated chroma-key green background must remain perfectly fixed and unchanged from frame to frame. Only the monster is allowed to move. There must be no background motion, no lighting flicker, no shadows moving across the green screen, and no visible screen or television frame.
+
+TIMELINE:
+From 0.00 to 0.08 seconds, show only the flat green background. The monster is completely below the bottom edge and not visible.
+
+From 0.08 to 0.20 seconds, the monster suddenly launches vertically upward from below the bottom edge at almost constant size. The top of its head appears first, followed immediately by the face and shoulders. It must reach its full visible size by 0.20 seconds. Do not make it grow, zoom in, fade in, crawl, climb, walk, float, or slowly rise. It must enter as a fast physical upward jump from outside the frame.
+
+From 0.20 to 0.35 seconds, the monster makes a sharp upward overshoot and immediately recoils, as if the object has inertia after being pulled upward.
+
+From 0.35 seconds until the end of the five-second shot, an unseen person outside the frame violently shakes the physical monster puppet. The invisible grip is below the bottom edge of the frame, around the lower torso or neck. The hand, arm, person, grip, string, stick, and every other holding device must remain completely outside the frame.
+
+PHYSICAL SUBJECT MOTION:
+The monster itself must move relative to the fixed green background. Generate new temporal frames showing real physical motion of the three-dimensional puppet. The monster should swing left and right by roughly 20 to 30 percent of its own width, move vertically by roughly 8 to 12 percent of the frame height, and roll irregularly by about 10 to 15 degrees. Use rapid, uneven direction changes, sudden jerks, inertia, overshoot, recoil, and slight secondary motion. The head and shoulders should move as a solid object, while the jaw, ears, eyelids, wrinkles, and mouth have subtle physical lag caused by the shaking. Add motion blur to the monster only, never to the green background.
+
+The shaking must feel like a real rubber horror puppet being grabbed and shaken hard by an unseen person. It must be irregular, physical, forceful, and chaotic, with several strong reversals every second. It must not look like a smooth digital sine wave, a camera effect, or a flat image being translated across the screen.
+
+CRITICAL NEGATIVE CONSTRAINTS:
+Do not shake the camera.
+Do not move the entire rectangular image.
+Do not animate the green background.
+Do not use a still image with simple pan, zoom, rotation, or global jitter.
+Do not make the monster remain frozen while the frame moves.
+Do not show a hand, arm, person, holder, string, stick, or prop.
+Do not add extra limbs or a second monster.
+Do not morph or replace the face.
+Do not make the monster walk, crawl, climb, float, hover, or wait at the bottom.
+Do not use cuts, fades, transitions, text, or background changes.
