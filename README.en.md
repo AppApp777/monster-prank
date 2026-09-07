@@ -65,7 +65,7 @@ Windows may show a blue box saying **"Windows protected your PC"**. Click `More 
 
 ### macOS (Apple silicon)
 
-1. Download `MonsterPrank-macOS.zip` (40 MB) from the [releases page](https://github.com/AppApp777/monster-prank/releases/latest).
+1. Download [**MonsterPrank-macOS.zip**](https://github.com/AppApp777/monster-prank/releases/latest/download/MonsterPrank-macOS.zip) (40 MB).
 2. Unzip it and drag `MonsterPrank.app` into Applications.
 3. **The first time, right-click the icon, choose Open, then click Open again in the dialog.** A plain double-click is blocked with "cannot verify the developer" — same reason as above: the app is neither code-signed nor notarised. It does not mean a virus was found.
 

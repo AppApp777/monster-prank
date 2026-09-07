@@ -65,7 +65,7 @@
 
 ### macOS（Apple 芯片）
 
-1. 从 [Release 页面](https://github.com/AppApp777/monster-prank/releases/latest)下载 `MonsterPrank-macOS.zip`（40 MB）。
+1. 下载 [**MonsterPrank-macOS.zip**](https://github.com/AppApp777/monster-prank/releases/latest/download/MonsterPrank-macOS.zip)（40 MB）。
 2. 解压后把 `MonsterPrank.app` 拖进“应用程序”。
 3. **第一次打开要右键点图标、选“打开”，再在弹窗里点一次“打开”**；直接双击会被系统拦下，提示无法验证开发者。原因同上：程序没做代码签名和公证，不是检测到病毒。
 
