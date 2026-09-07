@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	这份是**空的**，而且是实测之后才敢空的。
+
+	公证要求开强化运行时（hardened runtime），网上给 PyInstaller 打的包几乎都会顺手加上
+	下面这三条，本项目 2026-09-07 实测**一条都不需要**：
+
+	    com.apple.security.cs.allow-jit
+	    com.apple.security.cs.allow-unsigned-executable-memory
+	    com.apple.security.cs.disable-library-validation
+
+	怎么测的：拿本机那张 Apple Development 证书，把包里 164 个二进制 ＋ Python.framework
+	＋ 外壳全部用 `--options runtime` 重签一遍，分别配「三条全给／去掉库校验那条／一条不给」
+	三档，每档都跑 `--check` 与 `--demo`（`--demo` 会把面板、叠加窗、解码、放音整条走完，
+	PyObjC 和 libffi 都在那条路上）。三档退出码都是 0。
+
+	为什么不需要：① 打包脚本会把**每一个**内嵌二进制都用同一个身份重签，同队签名本来就过
+	库校验，所以 disable-library-validation 无用武之地；② CPython 3.12 与 PyAV 在这个包里
+	跑的路径不需要可写可执行内存。
+
+	⚠️ 什么情况下要把它们加回来：签完之后 app **一起手就闪退**（终端里跑主程序会看到
+	`killed` 或 `EXC_BAD_ACCESS`，`log show --predicate 'sender == "AMFI"'` 里有拒绝记录）。
+	那多半是有内嵌库没被重签、或换了会 JIT 的依赖。先补 disable-library-validation，
+	仍旧闪退再补另外两条——**一条一条加，加完重跑上面那三个测试**。
+	-->
+</dict>
+</plist>
