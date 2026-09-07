@@ -5,7 +5,12 @@
 这是一个可见、可取消的桌面叠加工具：控制面板负责设置一次性定时，
 到点后在主屏幕底部播放带 Alpha 通道的怪兽视频，播放结束自动关闭。
 
-依赖：Windows 或 macOS、Python 3.10+、Pillow、PyAV。没有 PyAV 时，源码环境仍可回退到 FFmpeg 工具。
+两个平台的界面是两套实现：Windows 走 Tk ＋ CustomTkinter，macOS 走 AppKit 原生控件，
+叠加窗同理（UpdateLayeredWindow ／ NSWindow ＋ CALayer）。Tk 在 macOS 上做不到逐像素透明，
+而 AppKit 控件必须跑在 NSApplication 的事件循环里，所以两边没法合成一套。
+
+依赖：Python 3.10+、Pillow、PyAV。Windows 另需 Tk ＋ CustomTkinter，macOS 另需 PyObjC
+（且一行 Tk 都不用）。没有 PyAV 时，源码环境仍可回退到 FFmpeg 工具。
 """
 
 from __future__ import annotations
@@ -14,6 +19,7 @@ import argparse
 import ctypes
 from ctypes import wintypes
 from datetime import datetime, timedelta
+import io
 import json
 import math
 import os
@@ -23,14 +29,30 @@ import shutil
 import subprocess
 import threading
 import time
-import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
 import sys
 import wave
 
-from PIL import Image, ImageDraw, ImageTk
+from PIL import Image, ImageDraw
 
-import customtkinter as ctk
+# ⛔ macOS 这一整条路一行 Tk 都不走：面板是 AppKit，叠加窗是 NSWindow。
+# 所以别在 mac 上 import tkinter／customtkinter——那会逼 mac 用户为一个
+# 完全用不到的库去 `brew install python-tk`，打包时还白背十几兆 Tcl/Tk。
+# 下面那个替身只为让 Windows 那半边代码里的 `except tk.TclError` 求值得出来，
+# 它永远不会被抛出；真去碰别的 Tk 属性会当场报错，好过静默走错分支。
+USE_TK = os.name == "nt"
+if USE_TK:
+    import tkinter as tk
+    from tkinter import filedialog, messagebox, ttk
+    import customtkinter as ctk
+else:
+    class _NoTk:
+        class TclError(Exception):
+            pass
+
+        def __getattr__(self, name):
+            raise RuntimeError("这个平台不使用 Tk，却访问了 tk.%s" % name)
+
+    tk = ttk = filedialog = messagebox = ctk = _NoTk()
 
 
 APP_TITLE = "Monster Prank｜桌面恶作剧"
@@ -148,7 +170,17 @@ if os.name == "nt":
 
 
 def system_idle_seconds():
-    """系统距上次键鼠输入的秒数；非 Windows 或读取失败返回 None。"""
+    """系统距上次键鼠输入的秒数；读取失败返回 None。"""
+    if sys.platform == "darwin":
+        try:
+            import Quartz
+        except ImportError:
+            return None
+        # 跟 Windows 的 GetLastInputInfo 同义：全系统级的、算所有输入设备。
+        # ⚠️ 必须用 CombinedSessionState 而不是 HIDSystemState——后者只看硬件，
+        # 触控板手势和某些外设的输入会漏掉，人早回来了它还以为屋里没人。
+        return max(0.0, float(Quartz.CGEventSourceSecondsSinceLastEventType(
+            Quartz.kCGEventSourceStateCombinedSessionState, Quartz.kCGAnyInputEventType)))
     if os.name != "nt":
         return None
     info = LASTINPUTINFO()
@@ -576,76 +608,122 @@ class LayeredOverlay:
 
 
 class MacOverlay:
-    """使用 macOS Tk 的透明无边框窗口显示带 Alpha 的帧。"""
+    """macOS 原生透明叠加窗（NSWindow ＋ CALayer 直传 CGImage）。
+
+    ⛔ 别改回 Tk 的 `-transparent` ＋ `systemTransparent`。那条路在 macOS 上是
+    **静默失效**的：属性设得进、读回来是 1，窗口却渲染成纯黑，Tk 8.6 与 9.0 一样。
+    2026-08-27 的第一版 macOS 适配就是那么写的，纸面成立、真机全黑，而且它自带的
+    `except tk.TclError` 保护分支一次都不会触发。详见 docs/BUGS.md 2026-09-07 条。
+    """
 
     def __init__(self, parent, width, height, x, y, on_escape):
         if sys.platform != "darwin":
             raise RuntimeError("macOS 透明叠加窗口只能在 macOS 上创建")
-        self.window = tk.Toplevel(parent)
-        self.window.overrideredirect(True)
-        self.window.geometry("%dx%d+%d+%d" % (width, height, x, y))
-        self.window.withdraw()
         try:
-            self.window.attributes("-topmost", True)
-            self.window.attributes("-transparent", True)
-            self.window.configure(bg="systemTransparent")
-        except tk.TclError as exc:
-            try:
-                self.window.destroy()
-            except tk.TclError:
-                pass
+            from AppKit import (
+                NSWindow, NSColor, NSView, NSMakeRect, NSScreen, NSEvent,
+                NSBackingStoreBuffered, NSWindowStyleMaskBorderless,
+                NSStatusWindowLevel, NSEventMaskKeyDown,
+            )
+            from Foundation import NSData
+            import Quartz
+        except ImportError as exc:  # 缺 PyObjC：源码环境没装依赖
             raise RuntimeError(
-                "当前 Python 的 Tk 不支持 macOS 透明窗口，请使用软件包内置版本"
+                "macOS 需要 PyObjC 才能创建透明叠加窗，请先 pip install pyobjc-framework-Cocoa"
             ) from exc
-        self.canvas = tk.Canvas(
-            self.window,
-            width=width,
-            height=height,
-            highlightthickness=0,
-            bd=0,
-            relief="flat",
-            bg="systemTransparent",
-        )
-        self.canvas.pack(fill="both", expand=True)
-        self.image_item = self.canvas.create_image(0, 0, anchor="nw")
-        self.photo = None
+
+        self._Quartz = Quartz
+        self._NSData = NSData
         self.width = width
         self.height = height
         self.x = x
         self.y = y
         self.closed = False
         self.visible = False
-        self.window.bind("<Escape>", lambda _event: on_escape())
-        self.window.protocol("WM_DELETE_WINDOW", on_escape)
-        self.window.update_idletasks()
+        self._colorspace = Quartz.CGColorSpaceCreateDeviceRGB()
+
+        # Cocoa 的坐标原点在左下角，传进来的 y 是 Tk 那套左上角原点，必须翻一次。
+        screen_height = NSScreen.mainScreen().frame().size.height
+        rect = NSMakeRect(x, screen_height - (y + height), width, height)
+        self.window = NSWindow.alloc().initWithContentRect_styleMask_backing_defer_(
+            rect, NSWindowStyleMaskBorderless, NSBackingStoreBuffered, False
+        )
+        self.window.setOpaque_(False)
+        self.window.setBackgroundColor_(NSColor.clearColor())
+        self.window.setLevel_(NSStatusWindowLevel)
+        self.window.setIgnoresMouseEvents_(True)   # 点击穿透，受害者照常用电脑
+        self.window.setHasShadow_(False)
+
+        view = NSView.alloc().initWithFrame_(NSMakeRect(0, 0, width, height))
+        view.setWantsLayer_(True)
+        self.window.setContentView_(view)
+        self._view = view
+        self._layer = view.layer()
+        self._layer.setContentsGravity_("resize")
+
+        # Esc 退出：局部监听只在本程序处于活跃状态时收事件，不需要辅助功能权限。
+        self._monitor = NSEvent.addLocalMonitorForEventsMatchingMask_handler_(
+            NSEventMaskKeyDown, lambda event: self._on_key(event, on_escape)
+        )
+
+    def _on_key(self, event, on_escape):
+        if event.keyCode() == 53:  # Esc
+            try:
+                on_escape()
+            except Exception:
+                pass
+            return None
+        return event
 
     def show(self):
         if self.closed or self.visible:
             return
-        self.window.deiconify()
-        self.window.lift()
-        self.window.attributes("-topmost", True)
+        self.window.orderFrontRegardless()
         self.visible = True
-        try:
-            self.window.focus_force()
-        except tk.TclError:
-            pass
 
     def update(self, image):
         if self.closed:
             return
+        # 预乘 alpha：CALayer 跟 Windows 的 UpdateLayeredWindow 一样要预乘，
+        # 直通 alpha 会在半透明边缘留白边；预乘必须在缩放之前做。
+        image = image.convert("RGBA").convert("RGBa")
         if image.size != (self.width, self.height):
             image = image.resize((self.width, self.height), Image.Resampling.LANCZOS)
-        self.photo = ImageTk.PhotoImage(image=image.convert("RGBA"))
-        self.canvas.itemconfigure(self.image_item, image=self.photo)
+        raw = image.tobytes("raw", "RGBa")
+        Quartz = self._Quartz
+        provider = Quartz.CGDataProviderCreateWithCFData(
+            self._NSData.dataWithBytes_length_(raw, len(raw))
+        )
+        cgimage = Quartz.CGImageCreate(
+            self.width, self.height, 8, 32, self.width * 4,
+            self._colorspace, Quartz.kCGImageAlphaPremultipliedLast,
+            provider, None, False, Quartz.kCGRenderingIntentDefault,
+        )
+        # ⛔ 必须关掉隐式动画：CALayer 换 contents 默认带 0.25 秒淡入，
+        # 逐帧播放时会把每一帧糊成上一帧的残影。
+        Quartz.CATransaction.begin()
+        Quartz.CATransaction.setDisableActions_(True)
+        self._layer.setContents_(cgimage)
+        Quartz.CATransaction.commit()
 
     def close(self):
-        if not self.closed:
-            self.closed = True
+        if self.closed:
+            return
+        self.closed = True
+        if self._monitor is not None:
             try:
-                self.window.destroy()
-            except tk.TclError:
+                from AppKit import NSEvent
+                NSEvent.removeMonitor_(self._monitor)
+            except Exception:
                 pass
+            self._monitor = None
+        try:
+            # ⛔ 用 orderOut_ 不用 close()：Tk 每轮事件循环会 drain autorelease pool，
+            # 此时 close() 会过度释放 contentView，直接 SIGABRT。见 docs/BUGS.md。
+            self.window.orderOut_(None)
+        except Exception:
+            pass
+        self.visible = False
 
 
 def create_overlay(parent, width, height, x, y, on_escape):
@@ -1813,7 +1891,7 @@ class ControlApp:
             return
         if system_idle_seconds() is None:
             messagebox.showerror(
-                "回场触发不可用", "读取系统输入状态失败（仅支持 Windows）。",
+                "回场触发不可用", "读取系统输入状态失败。",
                 parent=self.root,
             )
             return
@@ -1937,6 +2015,871 @@ class ControlApp:
         self.root.mainloop()
 
 
+# ============================================================================
+# macOS 原生控制面板
+#
+# 为什么 macOS 不复用上面那套 CustomTkinter 面板：CustomTkinter 的圆角、卡片、
+# 步进器全是拿 Tk 画布**模拟**出来的，所以它在两个平台上长得一模一样——也正因如此
+# 在 macOS 上哪儿都不对：不跟随系统深浅色、不跟随强调色、不是 SF Pro、窗口是一块
+# 实心白板。这里用 AppKit 原生控件重画一遍：毛玻璃窗底 ＋ 卡片 ＋ SF Symbols。
+#
+# ⛔ 一个绕不过去的前提：AppKit 控件**必须**跑在 NSApplication 的事件循环里。
+#    2026-09-07 实测：把 AppKit 面板挂在 Tk 的 mainloop 下时，`performClick_`
+#    能触发回调，但合成的真实鼠标点击一个都到不了，`NSApp.isActive()` 恒为 False
+#    ——Tk 用的是自己的 TKApplication 子类，没走完整的 Cocoa 应用激活流程。
+#    所以 macOS 这条整条换成 NSApplication.run()，Tk 在 macOS 上完全不参与。
+# ============================================================================
+
+_MAC_PANEL_CLS = None
+
+
+class CocoaLoop:
+    """Tk root 的替身。
+
+    OverlayPlayer 只用到 root 的四样能力——after / after_cancel /
+    winfo_screenwidth / winfo_screenheight——这里拿 NSTimer 与 NSScreen 顶上，
+    于是**播放器代码一行都不必为 macOS 分叉**，两个平台跑同一段调度逻辑。
+    """
+
+    def __init__(self):
+        from Foundation import NSTimer
+        from AppKit import NSScreen
+        self._NSTimer = NSTimer
+        self._NSScreen = NSScreen
+
+    def after(self, ms, fn):
+        return self._NSTimer.scheduledTimerWithTimeInterval_repeats_block_(
+            max(ms, 0) / 1000.0, False, lambda _timer: fn()
+        )
+
+    def after_cancel(self, job):
+        if job is None:
+            return
+        try:
+            job.invalidate()
+        except Exception:
+            pass
+
+    def winfo_screenwidth(self):
+        return int(self._NSScreen.mainScreen().frame().size.width)
+
+    def winfo_screenheight(self):
+        return int(self._NSScreen.mainScreen().frame().size.height)
+
+
+def pil_to_nsimage(image):
+    """PIL 图 → NSImage。只用于缩略图这种一次性场景；逐帧画面走的是 MacOverlay
+    里的 CGImage 直传，不经过 PNG 编解码。"""
+    from AppKit import NSImage
+    from Foundation import NSData
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+    raw = buffer.getvalue()
+    return NSImage.alloc().initWithData_(NSData.dataWithBytes_length_(raw, len(raw)))
+
+
+def mac_panel_class():
+    """延迟构造 macOS 面板类：AppKit 只在 macOS 上 import，Windows 完全不碰这段。"""
+    global _MAC_PANEL_CLS
+    if _MAC_PANEL_CLS is not None:
+        return _MAC_PANEL_CLS
+
+    import objc
+    from AppKit import (
+        NSAlert, NSApplication, NSApplicationActivationPolicyAccessory,
+        NSApplicationActivationPolicyRegular,
+        NSBackingStoreBuffered, NSBezelStyleRounded, NSButton,
+        NSColor, NSDatePicker, NSDatePickerElementFlagHourMinuteSecond,
+        NSDatePickerElementFlagYearMonthDay, NSDatePickerStyleTextFieldAndStepper,
+        NSEventModifierFlagCommand, NSFont, NSImage,
+        NSImageScaleProportionallyUpOrDown, NSImageView, NSLineBreakByTruncatingMiddle,
+        NSLineBreakByWordWrapping,
+        NSMakeRect, NSMenu, NSMenuItem, NSObject, NSOpenPanel, NSScreen,
+        NSSegmentedControl, NSSegmentSwitchTrackingSelectOne, NSStatusBar, NSStepper,
+        NSTextAlignmentCenter, NSTextField, NSVariableStatusItemLength, NSView,
+        NSVisualEffectBlendingModeBehindWindow, NSVisualEffectBlendingModeWithinWindow,
+        NSVisualEffectMaterialContentBackground,
+        NSVisualEffectMaterialUnderWindowBackground, NSVisualEffectStateActive,
+        NSVisualEffectView, NSWindow, NSWindowBelow, NSWindowStyleMaskClosable,
+        NSWindowStyleMaskFullSizeContentView, NSWindowStyleMaskMiniaturizable,
+        NSWindowStyleMaskTitled, NSWindowTitleHidden,
+    )
+    from Foundation import NSDate
+
+    PAD = 24        # 窗口左右内边距
+    WIN_W = 560     # 窗口宽度固定；高度按内容累加，摆完才定
+    TOP = 34        # 内容从这里往下排：标题栏透明，红绿灯占着最上面那一条
+
+    class MonsterFlippedView(NSView):
+        """让子视图的 y 从顶部往下算。Cocoa 默认原点在左下角，手排一屏控件极易错位。"""
+
+        def isFlipped(self):
+            return True
+
+    class MonsterPanelActions(NSObject):
+        """AppKit 控件只认 target-action，这里把 selector 转发到面板对象的普通方法。
+        它同时兼任窗口 delegate（窗口被关掉＝退出程序）。"""
+
+        def initWithPanel_(self, panel):
+            self = objc.super(MonsterPanelActions, self).init()
+            if self is None:
+                return None
+            self._panel = panel
+            return self
+
+        def onQuick_(self, sender):
+            self._panel.on_quick(sender)
+
+        def onStartCustom_(self, sender):
+            self._panel.on_start_custom()
+
+        def onSetExact_(self, sender):
+            self._panel.on_set_exact()
+
+        def onMinuteStep_(self, sender):
+            self._panel.minute_field.setStringValue_("%g" % sender.doubleValue())
+
+        def onMinuteField_(self, sender):
+            self._panel.sync_stepper(sender, self._panel.minute_stepper)
+
+        def onDurationStep_(self, sender):
+            self._panel.duration_field.setStringValue_("%.1f" % sender.doubleValue())
+
+        def onDurationField_(self, sender):
+            self._panel.sync_stepper(sender, self._panel.duration_stepper)
+
+        def onIdleStep_(self, sender):
+            self._panel.idle_field.setStringValue_("%g" % sender.doubleValue())
+
+        def onIdleField_(self, sender):
+            self._panel.sync_stepper(sender, self._panel.idle_stepper)
+
+        def onReturnStep_(self, sender):
+            self._panel.return_field.setStringValue_("%g" % sender.doubleValue())
+
+        def onReturnField_(self, sender):
+            self._panel.sync_stepper(sender, self._panel.return_stepper)
+
+        def onChooseVideo_(self, sender):
+            self._panel.on_choose_video()
+
+        def onPreview_(self, sender):
+            self._panel.preview()
+
+        def onCancel_(self, sender):
+            self._panel.cancel_schedule()
+
+        def onArm_(self, sender):
+            self._panel.toggle_activity_trigger()
+
+        def onQuit_(self, sender):
+            self._panel.close()
+
+        def onRecall_(self, sender):
+            self._panel.recall()
+
+        def windowWillClose_(self, notification):
+            self._panel.close()
+
+    class MacControlPanel:
+        """单页毛玻璃卡片面板：窗底是 NSVisualEffectView，两张卡片是 NSBox，
+        控件全部原生，深浅色与强调色跟随系统。"""
+
+        QUICK_CHOICES = [("30 秒", 30), ("1 分钟", 60), ("3 分钟", 180),
+                         ("5 分钟", 300), ("10 分钟", 600)]
+
+        def __init__(self, video_path, demo=False, chroma=None):
+            self.root = CocoaLoop()          # 给 OverlayPlayer 用的 root 替身
+            self.video_path = Path(video_path).resolve()
+            self.demo = demo
+            self.chroma_color = chroma
+            self.video_info = None
+            self.poster_image = None
+            self.thumbnail = None
+            self.player = None
+            self.prewarmed = None
+            self.schedule_job = None
+            self.prewarm_job = None
+            self.countdown_job = None
+            self.stealth_job = None
+            self.scheduled_run = False
+            self.activity_state = None      # None ／ waiting_idle ／ armed ／ returning
+            self.activity_job = None
+            self.activity_fire_time = None
+            self.status_item = None
+            self.closing = False
+            self.actions = MonsterPanelActions.alloc().initWithPanel_(self)
+            self.app = NSApplication.sharedApplication()
+            self.app.setActivationPolicy_(NSApplicationActivationPolicyRegular)
+            self._preload_assets()
+            self._build_menu()
+            self._build_window()
+            self._refresh_material_card()
+
+        # ---- 素材 ----
+
+        def _preload_assets(self):
+            try:
+                self.video_info = probe_video(self.video_path)
+            except Exception:
+                self.video_info = None
+            self.poster_image = load_poster(self.video_path)
+            self.thumbnail = load_thumbnail(self.video_path)
+
+        # ---- 界面零件 ----
+
+        def _label(self, text, size=13, bold=False, secondary=False, wrap=False):
+            field = NSTextField.labelWithString_(text)
+            field.setFont_(NSFont.boldSystemFontOfSize_(size) if bold
+                           else NSFont.systemFontOfSize_(size))
+            field.setTextColor_(NSColor.secondaryLabelColor() if secondary
+                                else NSColor.labelColor())
+            if wrap:
+                field.setLineBreakMode_(NSLineBreakByWordWrapping)
+                field.cell().setWraps_(True)
+            return field
+
+        def _symbol(self, name):
+            """SF Symbols 图标：跟着字重和深浅色走，比塞一张 png 干净。
+            macOS 11 以下拿不到时返回 None，调用处跳过即可。"""
+            image = NSImage.imageWithSystemSymbolName_accessibilityDescription_(name, None)
+            if image is None:
+                return None
+            image.setTemplate_(True)
+            view = NSImageView.imageViewWithImage_(image)
+            view.setContentTintColor_(NSColor.secondaryLabelColor())
+            view.setImageScaling_(NSImageScaleProportionallyUpOrDown)
+            return view
+
+        def _button(self, title, selector, x, y, w, h=26, primary=False):
+            button = NSButton.buttonWithTitle_target_action_(title, self.actions, selector)
+            button.setBezelStyle_(NSBezelStyleRounded)
+            if primary:
+                # 默认按钮＝跟随系统强调色。用户在系统设置里挑了什么色，这里就是什么色。
+                button.setKeyEquivalent_(chr(13))
+            return self._place(button, x, y, w, h)
+
+        def _stepper(self, low, high, step, value, selector, x, y):
+            stepper = NSStepper.alloc().init()
+            stepper.setMinValue_(low)
+            stepper.setMaxValue_(high)
+            stepper.setIncrement_(step)
+            stepper.setDoubleValue_(value)
+            stepper.setTarget_(self.actions)
+            stepper.setAction_(selector)
+            return self._place(stepper, x, y, 18, 25)
+
+        def _place(self, view, x, y, w, h):
+            view.setFrame_(NSMakeRect(x, y, w, h))
+            self.canvas.addSubview_(view)
+            return view
+
+        def _card(self, top, bottom):
+            """把已经摆好的一组控件用一张卡片垫在下面。
+
+            卡片本身也是一层 NSVisualEffectView（窗内混合），不是刷了色的方块——
+            ⛔ 别改回 `fillColor` ＋ `colorWithAlphaComponent_`：那个方法会把
+            `controlBackgroundColor` 这种**动态系统色当场烤成静态色**，构造时
+            系统是深色，卡片就永远是深色，用户切浅色时窗底变白、卡片还是黑的。
+            2026-09-07 第一版正是这么写的，浅色实测卡片一片深灰。
+
+            ⛔ 另一处：`addSubview_positioned_relativeTo_` 的第二个参数必须是
+            NSWindowBelow（-1）。写 0 那是 NSWindowOut，意思是把视图**移出**层级
+            ——卡片会静悄悄地不出现，而且不报任何错。
+            """
+            card = NSVisualEffectView.alloc().initWithFrame_(
+                NSMakeRect(PAD, top, WIN_W - PAD * 2, bottom - top))
+            card.setMaterial_(NSVisualEffectMaterialContentBackground)
+            card.setBlendingMode_(NSVisualEffectBlendingModeWithinWindow)
+            card.setState_(NSVisualEffectStateActive)
+            card.setWantsLayer_(True)
+            card.layer().setCornerRadius_(12.0)
+            card.layer().setMasksToBounds_(True)
+            self.canvas.addSubview_positioned_relativeTo_(card, NSWindowBelow, None)
+
+        def _build_menu(self):
+            """没有主菜单的话 Cmd+Q 不响应、输入框也用不了 Cmd+A／Cmd+V。"""
+            main = NSMenu.alloc().init()
+            for title, items in (
+                (APP_TITLE, [("退出 Monster Prank", "terminate:", "q")]),
+                ("编辑", [("剪切", "cut:", "x"), ("拷贝", "copy:", "c"),
+                          ("粘贴", "paste:", "v"), ("全选", "selectAll:", "a")]),
+            ):
+                holder = NSMenuItem.alloc().init()
+                submenu = NSMenu.alloc().initWithTitle_(title)
+                for name, selector, key in items:
+                    item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+                        name, selector, key)
+                    item.setKeyEquivalentModifierMask_(NSEventModifierFlagCommand)
+                    submenu.addItem_(item)
+                holder.setSubmenu_(submenu)
+                main.addItem_(holder)
+            self.app.setMainMenu_(main)
+
+        # ---- 界面主体 ----
+
+        def _build_window(self):
+            self.canvas = MonsterFlippedView.alloc().initWithFrame_(
+                NSMakeRect(0, 0, WIN_W, 100))
+            inner = PAD + 18                 # 卡片内的左边界
+            inner_w = WIN_W - PAD * 2 - 36   # 卡片内的可用宽度
+            y = TOP
+
+            # —— 标题区 ——
+            # 打包后 logo 被摊平到 assets/ 根下，源码环境才在 assets/logo/——两个都试
+            for parts in (("assets", "logo-128.png"), ("assets", "logo", "logo-128.png")):
+                logo_path = resource_path(*parts)
+                if not logo_path.is_file():
+                    continue
+                logo = NSImageView.imageViewWithImage_(
+                    NSImage.alloc().initWithContentsOfFile_(str(logo_path)))
+                logo.setImageScaling_(NSImageScaleProportionallyUpOrDown)
+                self._place(logo, PAD, y, 46, 46)
+                break
+            self._place(self._label("Monster Prank", 24, bold=True), PAD + 58, y + 1, 320, 30)
+            self._place(self._label("到点从屏幕底下窜出来，几秒后自己退干净", 12, secondary=True),
+                        PAD + 58, y + 30, 380, 18)
+            y += 68
+
+            # —— 卡片一：定时惊吓 ——
+            card_top = y
+            y += 16
+            symbol = self._symbol("alarm")
+            if symbol is not None:
+                self._place(symbol, inner, y, 19, 19)
+            self._place(self._label("定时惊吓", 13, bold=True), inner + 26, y + 1, 200, 18)
+            y += 30
+
+            self.segments = NSSegmentedControl.segmentedControlWithLabels_trackingMode_target_action_(
+                [name for name, _ in self.QUICK_CHOICES],
+                NSSegmentSwitchTrackingSelectOne, self.actions, "onQuick:")
+            self._place(self.segments, inner, y, inner_w, 26)
+            y += 40
+
+            self._place(self._label("自定义", 12, secondary=True), inner, y + 4, 46, 18)
+            self.minute_field = NSTextField.textFieldWithString_("3")
+            self.minute_field.setAlignment_(NSTextAlignmentCenter)
+            self.minute_field.setTarget_(self.actions)
+            self.minute_field.setAction_("onMinuteField:")
+            self._place(self.minute_field, inner + 50, y + 1, 56, 22)
+            self.minute_stepper = self._stepper(0.1, 720, 0.5, 3, "onMinuteStep:",
+                                                inner + 110, y)
+            self._place(self._label("分钟后", 12, secondary=True), inner + 134, y + 4, 52, 18)
+            self._button("开始倒计时", "onStartCustom:", inner + 190, y, 112)
+            y += 36
+
+            self._place(self._label("精确时刻", 12, secondary=True), inner, y + 4, 60, 18)
+            self.date_picker = NSDatePicker.alloc().init()
+            self.date_picker.setDatePickerStyle_(NSDatePickerStyleTextFieldAndStepper)
+            self.date_picker.setDatePickerElements_(
+                NSDatePickerElementFlagYearMonthDay | NSDatePickerElementFlagHourMinuteSecond)
+            self.date_picker.setDateValue_(NSDate.dateWithTimeIntervalSinceNow_(600))
+            self._place(self.date_picker, inner + 64, y + 1, 200, 24)
+            self._button("按时刻设定", "onSetExact:", inner + 278, y, 106)
+            y += 34
+            self._card(card_top, y)
+
+            # —— 卡片二：回场惊吓 ——
+            y += 16
+            card_top = y
+            y += 16
+            symbol = self._symbol("figure.walk")
+            if symbol is not None:
+                self._place(symbol, inner, y, 19, 19)
+            self._place(self._label("回场惊吓", 13, bold=True), inner + 26, y + 1, 200, 18)
+            self._place(self._label("无人时布防，人回来再触发", 11, secondary=True),
+                        inner + 92, y + 3, 220, 18)
+            y += 30
+
+            self._place(self._label("无人使用满", 12, secondary=True), inner, y + 4, 66, 18)
+            self.idle_field = NSTextField.textFieldWithString_("60")
+            self.idle_field.setAlignment_(NSTextAlignmentCenter)
+            self.idle_field.setTarget_(self.actions)
+            self.idle_field.setAction_("onIdleField:")
+            self._place(self.idle_field, inner + 70, y + 1, 48, 22)
+            self.idle_stepper = self._stepper(10, 86400, 10, 60, "onIdleStep:",
+                                              inner + 122, y)
+            self._place(self._label("秒，人回来", 12, secondary=True), inner + 146, y + 4, 66, 18)
+            self.return_field = NSTextField.textFieldWithString_("3")
+            self.return_field.setAlignment_(NSTextAlignmentCenter)
+            self.return_field.setTarget_(self.actions)
+            self.return_field.setAction_("onReturnField:")
+            self._place(self.return_field, inner + 216, y + 1, 44, 22)
+            self.return_stepper = self._stepper(1, 300, 1, 3, "onReturnStep:",
+                                                inner + 264, y)
+            self._place(self._label("秒后触发", 12, secondary=True), inner + 288, y + 4, 56, 18)
+            self.activity_button = self._button(
+                "布防", "onArm:", WIN_W - PAD - 108, y, 90)
+            y += 30
+            self._place(self._label(
+                "布防后面板收进菜单栏，Dock 里也不留图标；点菜单栏图标可召回。",
+                11, secondary=True), inner, y, 420, 18)
+            y += 24
+            self._card(card_top, y)
+
+            # —— 卡片三：怪兽素材 ——
+            y += 16
+            card_top = y
+            y += 16
+            symbol = self._symbol("film")
+            if symbol is not None:
+                self._place(symbol, inner, y, 19, 19)
+            self._place(self._label("怪兽素材", 13, bold=True), inner + 26, y + 1, 200, 18)
+            y += 28
+
+            self.thumb_view = NSImageView.alloc().initWithFrame_(NSMakeRect(0, 0, 72, 72))
+            self.thumb_view.setImageScaling_(NSImageScaleProportionallyUpOrDown)
+            self.thumb_view.setWantsLayer_(True)
+            self.thumb_view.layer().setCornerRadius_(8.0)
+            self.thumb_view.layer().setMasksToBounds_(True)
+            self._place(self.thumb_view, inner, y, 72, 72)
+            self.name_label = self._label(self.video_path.name, 12, bold=True)
+            # 素材文件名常常比卡片宽，中间省略比右边硬切好认（首尾都还看得见）
+            self.name_label.setLineBreakMode_(NSLineBreakByTruncatingMiddle)
+            self.name_label.cell().setTruncatesLastVisibleLine_(True)
+            self._place(self.name_label, inner + 84, y + 12, 240, 18)
+            self.spec_label = self._label("正在读取素材信息……", 11, secondary=True)
+            self._place(self.spec_label, inner + 84, y + 34, 240, 18)
+            self._button("选择视频…", "onChooseVideo:", WIN_W - PAD - 122, y + 24, 104)
+            y += 82
+
+            self._place(self._label("播放", 12, secondary=True), inner, y + 4, 32, 18)
+            self.duration_field = NSTextField.textFieldWithString_("5.0")
+            self.duration_field.setAlignment_(NSTextAlignmentCenter)
+            self.duration_field.setTarget_(self.actions)
+            self.duration_field.setAction_("onDurationField:")
+            self._place(self.duration_field, inner + 36, y + 1, 56, 22)
+            self.duration_stepper = self._stepper(0.2, 60, 0.5, 5.0, "onDurationStep:",
+                                                  inner + 96, y)
+            self._place(self._label("秒　　上限＝素材本身的长度", 11, secondary=True),
+                        inner + 120, y + 4, 280, 18)
+            y += 32
+            self._card(card_top, y)
+
+            # —— 按钮行 ——
+            y += 20
+            self._button("先吓自己试试", "onPreview:", PAD, y, 132, 30, primary=True)
+            self._button("取消定时", "onCancel:", PAD + 142, y, 100, 30)
+            self._button("退出", "onQuit:", WIN_W - PAD - 80, y, 80, 30)
+            y += 42
+
+            self.countdown_label = self._label("未设置定时", 12, bold=True)
+            self._place(self.countdown_label, PAD, y, WIN_W - PAD * 2, 18)
+            y += 24
+            self.status_label = self._label(
+                "就绪。可以立即预览，或者设一个一次性定时。", 12, secondary=True, wrap=True)
+            self._place(self.status_label, PAD, y, WIN_W - PAD * 2, 34)
+            y += 38
+            self._place(self._label(
+                "不注册开机启动，不建隐藏计划任务；关掉面板即取消全部定时。",
+                11, secondary=True), PAD, y, WIN_W - PAD * 2, 18)
+            y += 18 + PAD
+
+            win_h = y
+            self.canvas.setFrame_(NSMakeRect(0, 0, WIN_W, win_h))
+
+            screen = NSScreen.mainScreen().frame()
+            self.window = NSWindow.alloc().initWithContentRect_styleMask_backing_defer_(
+                NSMakeRect((screen.size.width - WIN_W) / 2,
+                           (screen.size.height - win_h) / 2 + 80, WIN_W, win_h),
+                NSWindowStyleMaskTitled | NSWindowStyleMaskClosable
+                | NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskFullSizeContentView,
+                NSBackingStoreBuffered, False)
+            self.window.setTitle_(APP_TITLE)
+            self.window.setTitlebarAppearsTransparent_(True)   # 内容延伸进标题栏
+            self.window.setTitleVisibility_(NSWindowTitleHidden)
+            self.window.setMovableByWindowBackground_(True)
+
+            effect = NSVisualEffectView.alloc().initWithFrame_(
+                NSMakeRect(0, 0, WIN_W, win_h))
+            effect.setMaterial_(NSVisualEffectMaterialUnderWindowBackground)
+            effect.setBlendingMode_(NSVisualEffectBlendingModeBehindWindow)
+            effect.setState_(NSVisualEffectStateActive)   # 失焦也保持磨砂，不塌成灰板
+            effect.addSubview_(self.canvas)
+            self.window.setContentView_(effect)
+            self.window.setDelegate_(self.actions)
+            # ⛔ 不指定的话，第一个 NSTextField 会自动拿到焦点，一开窗就是一根闪烁的
+            # 光标戳在“自定义分钟”里。让分段控件接住初始焦点，Tab 仍能走到输入框。
+            self.window.setInitialFirstResponder_(self.segments)
+
+        def _refresh_material_card(self):
+            if self.thumbnail is not None:
+                self.thumb_view.setImage_(pil_to_nsimage(self.thumbnail))
+            self.name_label.setStringValue_(self.video_path.name)
+            if self.video_info is None:
+                self.spec_label.setStringValue_("读不出素材信息")
+                return
+            width, height, fps, duration = self.video_info
+            self.spec_label.setStringValue_(
+                "%d×%d · %.1f 秒 · %.0f fps" % (width, height, duration, fps))
+            self.duration_stepper.setMaxValue_(max(0.2, duration))
+            try:
+                current = float(self.duration_field.stringValue())
+            except ValueError:
+                current = 0
+            if current > duration:
+                self.duration_field.setStringValue_("%.1f" % duration)
+                self.duration_stepper.setDoubleValue_(duration)
+
+        # ---- 小工具 ----
+
+        def sync_stepper(self, field, stepper):
+            """手打进输入框的值要回灌给步进器，否则下次点箭头会跳回旧值。"""
+            try:
+                stepper.setDoubleValue_(float(field.stringValue().strip()))
+            except ValueError:
+                pass
+
+        def set_status(self, text):
+            self.status_label.setStringValue_(text)
+
+        def _alert(self, title, text):
+            alert = NSAlert.alloc().init()
+            alert.setMessageText_(title)
+            alert.setInformativeText_(str(text))
+            alert.runModal()
+
+        def parse_duration(self):
+            try:
+                duration = float(self.duration_field.stringValue().strip())
+            except ValueError:
+                raise ValueError("播放时长必须是数字")
+            if not 0.2 <= duration <= 60:
+                raise ValueError("播放时长请设置在 0.2 到 60 秒之间")
+            if self.video_info is not None:
+                source_duration = self.video_info[3]
+                if duration > source_duration + 0.1:
+                    raise ValueError(
+                        "当前素材只有 %.2f 秒，请把播放时长设为不超过素材长度" % source_duration)
+            return duration
+
+        # ---- 动作 ----
+
+        def on_quick(self, sender):
+            index = sender.selectedSegment()
+            if 0 <= index < len(self.QUICK_CHOICES):
+                self._schedule_target(
+                    datetime.now() + timedelta(seconds=self.QUICK_CHOICES[index][1]))
+
+        def on_start_custom(self):
+            try:
+                minutes = float(self.minute_field.stringValue().strip())
+            except ValueError:
+                self._alert("定时设置有误", "自定义分钟数必须是数字")
+                return
+            if not 0.1 <= minutes <= 720:
+                self._alert("定时设置有误", "自定义分钟数请设在 0.1 到 720 之间")
+                return
+            self._schedule_target(datetime.now() + timedelta(seconds=minutes * 60))
+
+        def on_set_exact(self):
+            target = datetime.fromtimestamp(
+                self.date_picker.dateValue().timeIntervalSince1970())
+            if target <= datetime.now():
+                self._alert("定时设置有误", "那个时刻已经过去了，请选一个将来的时间。")
+                return
+            self._schedule_target(target)
+
+        def on_choose_video(self):
+            panel = NSOpenPanel.openPanel()
+            panel.setAllowedFileTypes_(["webm", "mov", "mp4", "mkv", "avi", "gif", "png"])
+            panel.setAllowsMultipleSelection_(False)
+            if panel.runModal() != 1:      # NSModalResponseOK
+                return
+            path = Path(str(panel.URLs()[0].path()))
+            try:
+                info = probe_video(path)
+            except Exception as exc:
+                self._alert("这个素材用不了", exc)
+                return
+            self.video_path = path
+            self.video_info = info
+            self.poster_image = load_poster(path)
+            self.thumbnail = load_thumbnail(path)
+            self._discard_prewarmed()
+            self._refresh_material_card()
+            self.set_status("已换成 %s。" % path.name)
+
+        def preview(self):
+            player = self.player
+            self.player = None
+            try:
+                if player is None or not player.prepared or player.stopped or player.live:
+                    if player is not None:
+                        player.discard()
+                    player = self._build_player()
+                    player.prepare()
+                self.set_status("预览播放中。按 Esc 可立即关闭。")
+                # 先藏面板再开播：怪兽画面里任何时刻都不能出现“恶作剧软件”本身。
+                self.window.orderOut_(None)
+                self.player = player
+                player.go()
+            except Exception as exc:
+                if player is not None:
+                    player.discard()
+                self.player = None
+                self._restore_panel()
+                self._alert("无法预览", exc)
+                self.set_status("预览失败：%s" % exc)
+
+        def cancel_schedule(self):
+            for name in ("schedule_job", "prewarm_job", "countdown_job", "stealth_job"):
+                self.root.after_cancel(getattr(self, name))
+                setattr(self, name, None)
+            self._discard_prewarmed()
+            self._remove_status_item()
+            self.countdown_label.setStringValue_("未设置定时")
+            self.set_status("定时已取消。")
+
+        # ---- 定时 ----
+
+        def _build_player(self):
+            return OverlayPlayer(self, self.video_path, self.parse_duration(),
+                                 self._playback_done, video_info=self.video_info,
+                                 poster=self.poster_image, chroma=self.chroma_color)
+
+        def _prewarm_for_trigger(self):
+            self.prewarm_job = None
+            if self.prewarmed is not None:
+                return
+            try:
+                player = self._build_player()
+                player.prepare()
+                self.prewarmed = player
+            except Exception:
+                self.prewarmed = None
+
+        def _discard_prewarmed(self):
+            if self.prewarmed is not None:
+                self.prewarmed.discard()
+                self.prewarmed = None
+
+        def _schedule_target(self, target):
+            try:
+                self.parse_duration()
+            except ValueError as exc:
+                self._alert("定时设置有误", exc)
+                return
+            if self.schedule_job:
+                self.cancel_schedule()
+            self._disarm_activity(quiet=True)   # 定时与回场触发互斥，后设的生效
+            self._discard_prewarmed()
+            delay_ms = max(1, int((target - datetime.now()).total_seconds() * 1000))
+            self.schedule_job = self.root.after(delay_ms, self._scheduled_start)
+            # 到点前 5 秒静默预热，首帧不卡（定时不足 5 秒就立刻热）
+            self.prewarm_job = self.root.after(max(0, delay_ms - 5000),
+                                               self._prewarm_for_trigger)
+            remaining = max(1, int(round((target - datetime.now()).total_seconds())))
+            when = ("%d 分 %d 秒后" % divmod(remaining, 60)) if remaining >= 60 \
+                else ("%d 秒后" % remaining)
+            self.set_status("定时已设置，%s启动。面板 3 秒后收进菜单栏，"
+                            "点那个图标随时召回。" % when)
+            self.stealth_job = self.root.after(3000, self._enter_stealth)
+            self._update_countdown(target)
+
+        def _update_countdown(self, target):
+            if not self.schedule_job:
+                return
+            remaining = max(0, int((target - datetime.now()).total_seconds()))
+            minutes, seconds = divmod(remaining, 60)
+            hours, minutes = divmod(minutes, 60)
+            self.countdown_label.setStringValue_(
+                "距离启动：%02d:%02d:%02d" % (hours, minutes, seconds))
+            self.countdown_job = self.root.after(1000, lambda: self._update_countdown(target))
+
+        def _scheduled_start(self):
+            self.schedule_job = None
+            self.prewarm_job = None
+            self.root.after_cancel(self.countdown_job)
+            self.countdown_job = None
+            self.root.after_cancel(self.stealth_job)
+            self.stealth_job = None
+            self.countdown_label.setStringValue_("已到时，正在启动")
+            self._remove_status_item()
+            # 定时触发的这一次播完就整个退出：面板弹回来会当场拆穿恶作剧。
+            self.scheduled_run = True
+            if self.prewarmed is not None:
+                self.player, self.prewarmed = self.prewarmed, None
+                self.set_status("正在播放。")
+                self.window.orderOut_(None)
+                self.player.go()
+            else:
+                self.preview()
+
+        # ---- 回场惊吓 ----
+        #
+        # 逻辑跟 Windows 版逐字对齐：等无人使用满 N 秒 → 布防并隐身 → 一旦有人
+        # 碰键鼠就开始倒数 → 到点开播。差别只在读空闲的接口，那一层已经在
+        # system_idle_seconds() 里按平台分好了。
+
+        def _activity_params(self):
+            idle_need = float(self.idle_field.stringValue().strip())
+            delay = float(self.return_field.stringValue().strip())
+            return idle_need, delay
+
+        def toggle_activity_trigger(self):
+            if self.activity_state is not None:
+                self._disarm_activity()
+                self._restore_panel()
+                self._discard_prewarmed()
+                self.set_status("回场触发已撤防。")
+                return
+            try:
+                try:
+                    idle_need, delay = self._activity_params()
+                except ValueError:
+                    raise ValueError("布防参数必须是数字")
+                if not 10 <= idle_need <= 86400:
+                    raise ValueError("布防等待请设在 10 到 86400 秒之间")
+                if not 1 <= delay <= 300:
+                    raise ValueError("回来后的触发延迟请设在 1 到 300 秒之间")
+                self.parse_duration()
+            except ValueError as exc:
+                self._alert("回场触发设置有误", exc)
+                return
+            if system_idle_seconds() is None:
+                self._alert("回场触发不可用", "读不到系统输入状态。")
+                return
+            self.cancel_schedule()
+            self.activity_state = "waiting_idle"
+            self.activity_button.setTitle_("撤防")
+            self.set_status("回场触发已布防：无人使用满 %d 秒后进入监听"
+                            "（面板届时收进菜单栏），此后有人回来 %d 秒后触发。"
+                            % (idle_need, delay))
+            self._activity_poll()
+
+        def _activity_poll(self):
+            self.activity_job = None
+            if self.activity_state is None:
+                return
+            idle = system_idle_seconds()
+            if idle is None:
+                self._disarm_activity()
+                self._discard_prewarmed()
+                self.set_status("读不到系统输入状态，回场触发已撤防。")
+                return
+            try:
+                idle_need, delay = self._activity_params()
+            except ValueError:
+                self._disarm_activity()
+                self._discard_prewarmed()
+                self.set_status("布防参数被改成了非数字，回场触发已撤防。")
+                return
+            if self.activity_state == "waiting_idle":
+                self.countdown_label.setStringValue_(
+                    "回场触发：等无人使用满 %d 秒（当前已空闲 %d 秒）" % (idle_need, idle))
+                if idle >= idle_need:
+                    self.activity_state = "armed"
+                    self.countdown_label.setStringValue_("回场触发：已布防，等人回来")
+                    self._enter_stealth()
+                    # 人不在的此刻预热最无痕，等人回来时一切早已就绪
+                    self._prewarm_for_trigger()
+            elif self.activity_state == "armed":
+                if idle < 1.0:
+                    self.activity_state = "returning"
+                    self.activity_fire_time = time.monotonic() + delay
+            elif self.activity_state == "returning":
+                remaining = self.activity_fire_time - time.monotonic()
+                if remaining <= 0:
+                    self._disarm_activity(quiet=True)
+                    self.countdown_label.setStringValue_("回场触发：启动！")
+                    self._remove_status_item()
+                    # 与定时路径同款：播完整个程序退出，面板不弹回来穿帮
+                    self.scheduled_run = True
+                    if self.prewarmed is not None:
+                        self.player, self.prewarmed = self.prewarmed, None
+                        self.window.orderOut_(None)
+                        self.player.go()
+                    else:
+                        self.preview()
+                    return
+                self.countdown_label.setStringValue_(
+                    "回场触发：%d 秒后启动" % max(1, round(remaining)))
+            self.activity_job = self.root.after(500, self._activity_poll)
+
+        def _disarm_activity(self, quiet=False):
+            self.activity_state = None
+            self.activity_fire_time = None
+            self.root.after_cancel(self.activity_job)
+            self.activity_job = None
+            self.activity_button.setTitle_("布防")
+            self._remove_status_item()
+            if not quiet:
+                self.countdown_label.setStringValue_("未设置定时")
+
+        # ---- 待命隐身：面板收进菜单栏 ----
+        #
+        # Windows 那边用的是 Ctrl+Alt+M 全局热键。macOS 上注册全局热键要辅助功能
+        # 权限（还得让用户自己去系统设置里勾一遍），对一个恶作剧小工具太重了；
+        # 菜单栏图标不需要任何权限，而且本来就是 mac 应用的常规做法。
+
+        def _enter_stealth(self):
+            self.stealth_job = None
+            if not (self.schedule_job or self.activity_state):
+                return
+            self.window.orderOut_(None)
+            # 藏窗口还不够——Dock 上留着图标等于自首。切成 Accessory 就从 Dock 和
+            # 应用切换器里一起消失，只剩菜单栏那个小图标，召回时再切回来。
+            self.app.setActivationPolicy_(NSApplicationActivationPolicyAccessory)
+            if self.status_item is not None:
+                return
+            self.status_item = NSStatusBar.systemStatusBar().statusItemWithLength_(
+                NSVariableStatusItemLength)
+            button = self.status_item.button()
+            symbol = NSImage.imageWithSystemSymbolName_accessibilityDescription_(
+                "hare.fill", "Monster Prank")
+            if symbol is not None:
+                symbol.setTemplate_(True)
+                button.setImage_(symbol)
+            else:
+                button.setTitle_("MP")
+            button.setToolTip_("Monster Prank 正在待命，点一下召回面板")
+            button.setTarget_(self.actions)
+            button.setAction_("onRecall:")
+
+        def _remove_status_item(self):
+            if self.status_item is not None:
+                NSStatusBar.systemStatusBar().removeStatusItem_(self.status_item)
+                self.status_item = None
+
+        def _restore_panel(self):
+            self.app.setActivationPolicy_(NSApplicationActivationPolicyRegular)
+            self.window.makeKeyAndOrderFront_(None)
+            self.app.activateIgnoringOtherApps_(True)
+
+        def recall(self):
+            self._restore_panel()
+
+        # ---- 收尾 ----
+
+        def _playback_done(self):
+            self.player = None
+            if self.demo or self.scheduled_run:
+                self.root.after(200, self.close)
+                return
+            self._restore_panel()
+            self.set_status("播放完成。")
+
+        def close(self):
+            if self.closing:
+                return
+            self.closing = True
+            self.window.setDelegate_(None)   # 免得 terminate 又绕回这里
+            self._disarm_activity(quiet=True)
+            self.cancel_schedule()
+            if self.player is not None:
+                self.player.discard()
+                self.player = None
+            self.app.terminate_(None)
+
+        def run(self):
+            self._restore_panel()
+            self.app.run()
+
+    _MAC_PANEL_CLS = MacControlPanel
+    return MacControlPanel
+
+
 def main():
     parser = argparse.ArgumentParser(description="透明怪兽桌面恶作剧工具")
     parser.add_argument("--video", default=str(DEFAULT_VIDEO), help="透明视频路径")
@@ -1992,7 +2935,10 @@ def main():
             except RuntimeError:
                 print("ffplay=not-found")
         return 0
-    app = ControlApp(video_path, demo=args.demo, chroma=chroma_color)
+    # macOS 走原生 AppKit 面板，Windows 走 CustomTkinter 面板。
+    # 两个类刻意保持同样的外形（root ／ preview ／ run），所以下面这三行不分叉。
+    panel_class = mac_panel_class() if sys.platform == "darwin" else ControlApp
+    app = panel_class(video_path, demo=args.demo, chroma=chroma_color)
     if args.preview or args.demo:
         app.root.after(500, app.preview)
     app.run()

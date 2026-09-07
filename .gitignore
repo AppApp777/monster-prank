@@ -17,3 +17,7 @@ assets/monster_transparent_shaken_poster.png
 
 # 内部工作档（进度、bug 历史），不进公开仓
 docs/
+
+# 本地虚拟环境
+.venv/
+.venv311/

@@ -1,4 +1,8 @@
 Pillow>=11.0
 av>=18.0,<19
-customtkinter>=6.0
+# CustomTkinter 只有 Windows 界面在用；macOS 的面板是 AppKit 原生的
+customtkinter>=6.0; sys_platform == "win32"
 pyinstaller>=6.0
+# macOS 的透明叠加窗走原生 NSWindow，必须有 PyObjC；Windows 上 pip 会自动跳过这两行
+pyobjc-framework-Cocoa>=10.0; sys_platform == "darwin"
+pyobjc-framework-Quartz>=10.0; sys_platform == "darwin"

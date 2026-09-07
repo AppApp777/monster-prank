@@ -4,13 +4,13 @@
 
 # Monster Prank
 
-A Windows screen prank tool. At the time you set, a monster jumps up from the bottom of the screen and screams. About five seconds later the program exits on its own.
+A screen prank tool for Windows and macOS. At the time you set, a monster jumps up from the bottom of the screen and screams. About five seconds later the program exits on its own.
 
 <p><a href="README.md">简体中文</a> · <b>English</b></p>
 
 <p>
-<img src="https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078D4?style=for-the-badge" alt="Platform">
-<img src="https://img.shields.io/badge/Size-49%20MB-6B5442?style=for-the-badge" alt="Size">
+<img src="https://img.shields.io/badge/Platform-Windows%20%C2%B7%20macOS-0078D4?style=for-the-badge" alt="Platform">
+<img src="https://img.shields.io/badge/Size-49%20MB%20%C2%B7%2040%20MB-6B5442?style=for-the-badge" alt="Size">
 <img src="https://img.shields.io/github/license/AppApp777/monster-prank?style=for-the-badge" alt="License">
 <img src="https://img.shields.io/github/v/release/AppApp777/monster-prank?style=for-the-badge" alt="Latest release">
 </p>
@@ -21,7 +21,15 @@ A Windows screen prank tool. At the time you set, a monster jumps up from the bo
 
 ## What it does
 
-<img src="assets/shot-panel.png" width="600" alt="Control panel">
+<table>
+<tr>
+<td><img src="assets/shot-panel.png" width="380" alt="Windows control panel"></td>
+<td><img src="assets/shot-panel-macos.png" width="380" alt="macOS control panel"></td>
+</tr>
+<tr><td align="center">Windows</td><td align="center">macOS</td></tr>
+</table>
+
+Both platforms do the same things. The interface follows the host system: Windows draws its own cards, macOS uses native controls and follows the system light/dark mode and accent colour.
 
 The control panel offers three ways to fire it:
 
@@ -31,8 +39,8 @@ The control panel offers three ways to fire it:
 
 ### Behaviour
 
-- Three seconds after a timer is set, the control panel hides completely and no longer appears in the taskbar.
-- `Ctrl + Alt + M` brings the panel back. Doing so does not cancel the timer.
+- Three seconds after a timer is set, the control panel hides. On Windows it disappears from the taskbar too; on macOS it moves into the menu bar and leaves the Dock.
+- To bring the panel back: `Ctrl + Alt + M` on Windows, or click the small menu bar icon on macOS. Doing so does not cancel the timer.
 - Closing the panel cancels all timers.
 - `Esc` stops playback immediately.
 - On a multi-monitor setup, playback covers the primary screen only.
@@ -47,15 +55,21 @@ Use `选择视频…` on the panel to swap the asset:
 
 ## Download and run
 
-Windows 10 and 11. There is no prebuilt macOS package.
+### Windows 10 / 11
 
 1. Download [**MonsterPrank-windows.zip**](https://github.com/AppApp777/monster-prank/releases/latest/download/MonsterPrank-windows.zip) (49 MB).
 2. Unzip it and run `MonsterPrank.exe`.
 3. `MonsterPrank.exe` reads the `_internal` and `assets` folders next to it, so it cannot be moved out on its own. If double-clicking does nothing, or a black window flashes and disappears, that is usually why.
 
-### On first run
-
 Windows may show a blue box saying **"Windows protected your PC"**. Click `More info`, then `Run anyway`. That message means the program is not code-signed and Microsoft cannot identify the publisher. It does not mean a virus was found.
+
+### macOS (Apple silicon)
+
+1. Download `MonsterPrank-macOS.zip` (40 MB) from the [releases page](https://github.com/AppApp777/monster-prank/releases/latest).
+2. Unzip it and drag `MonsterPrank.app` into Applications.
+3. **The first time, right-click the icon, choose Open, then click Open again in the dialog.** A plain double-click is blocked with "cannot verify the developer" — same reason as above: the app is neither code-signed nor notarised. It does not mean a virus was found.
+
+The package is arm64 only, so **it will not run on an Intel Mac**; build from source in that case. It has only been tested on macOS 26 — I have no older machine to check against.
 
 `SHA256SUMS.txt` is attached to the release if you want to verify the download.
 
@@ -94,10 +108,12 @@ See [CHANGELOG.md](CHANGELOG.md).
 
 ### From source
 
-Python 3.10+ with Tk, plus:
+Python 3.10+ with Tk on Windows. macOS only needs PyObjC — neither the panel nor the overlay goes through Tk there.
 
 ```bash
-python -m pip install Pillow customtkinter av
+python -m pip install Pillow av
+python -m pip install customtkinter                                   # Windows panel only
+python -m pip install pyobjc-framework-Cocoa pyobjc-framework-Quartz   # macOS only
 ```
 
 ```bash
